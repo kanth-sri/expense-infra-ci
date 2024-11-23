@@ -13,13 +13,13 @@ pipeline{
     stages{
         stage('Init and Plan'){
             steps{
-                // withAWS(region: 'us-east-1', credentials: 'aws-tf-cred') {
+                 withAWS(region: 'us-east-1', credentials: 'aws-creds') {
                     sh """
                     cd 00-vpc
                     terraform init -reconfigure
                     terraform plan -out=tfplan
                     """
-                //}
+                }
             }
         }
         stage('Apply or Destroy') {

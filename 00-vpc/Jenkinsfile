@@ -1,20 +1,24 @@
-pipeline{
+pipeline {
     agent {
         label 'AGENT-1'
     }
-     options{
+    options {
         timeout(time: 30, unit: 'MINUTES')
         disableConcurrentBuilds()
         ansiColor('xterm')
     }
-    parameters{
-        choice(name: 'ACTION', choices: ['apply','destroy'], description: 'select ACTION')
+    parameters {
+        choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Select ACTION')
     }
-    stages{
+    stages {
         stage('Init and Plan') {
             steps {
+                script {
+                    echo "Starting Init and Plan Stage"
+                }
                 withAWS(region: 'us-east-1', credentials: 'aws-creds') {
                     sh """
+                        set -x
                         cd 00-vpc
                         terraform init -reconfigure
                         terraform plan -out=tfplan
@@ -22,47 +26,18 @@ pipeline{
                 }
             }
         }
-        stage('Apply or Destroy') {
-            input {
-                message "Should we continue to ${params.ACTION}"
-                ok "Yes, we should."
-            }
-            steps {
-                withAWS(region: 'us-east-1', credentials: 'aws-tf-cred') {
-                    sh """
-                        cd 00-vpc
-                        if [ ${params.ACTION} == 'apply' ]
-                        then
-                            terraform apply -auto-approve tfplan
-                        elif [ ${params.ACTION} == 'destroy' ]
-                        then
-                            terraform destroy -auto-approve
-                        fi
-                    """
-                }
-            }
-        }
-        stage ('Trigger SG') {
-            when {
-                expression { params.ACTION == 'apply' }
-            }
-            steps{
-                build job: '10-sg', parameters: [string(name: 'ACTION', value: "apply")], wait: false
-            }
-        }
+        // Other stages follow
     }
-
     post {
-        always{
-            echo "This sections runs always"
+        always {
+            echo "Cleaning up workspace..."
             deleteDir()
         }
-        success{
-            echo "This section run when pipeline success"
+        success {
+            echo "Pipeline completed successfully."
         }
-        failure{
-            echo "This section run when pipeline failure"
+        failure {
+            echo "Pipeline failed. Check the logs for details."
         }
     }
-    
 }

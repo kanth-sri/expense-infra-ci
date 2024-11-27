@@ -23,10 +23,10 @@ pipeline{
             }
         }
         stage('Apply or Destroy') {
-            input {
-                message "Should we continue to ${params.ACTION}"
-                ok "Yes, we should."
-            }
+            // input {
+            //     message "Should we continue to ${params.ACTION}"
+            //     ok "Yes, we should."
+            // }
             steps {
                 withAWS(region: 'us-east-1', credentials: 'aws-creds') {
                     sh """
@@ -42,6 +42,35 @@ pipeline{
                 }
             }
         }
+        stage ('Trigger multi') {
+             when {
+                 expression { params.ACTION == 'apply' }
+                  }
+                parallel{
+                    stage('bastion'){
+                    steps{
+                 build job: '20-bastion', parameters: [string(name: 'ACTION', value: "apply")], wait: false
+                 }
+                    }
+                    stage('rds'){
+                    steps{
+                 build job: '30-rds', parameters: [string(name: 'ACTION', value: "apply")], wait: false
+                 }
+                    }
+                    stage('eks'){
+                    steps{
+                 build job: '40-eks', parameters: [string(name: 'ACTION', value: "apply")], wait: false
+                 }
+                    }
+                    stage('acm'){
+                    steps{
+                 build job: '50-acm', parameters: [string(name: 'ACTION', value: "apply")], wait: false
+                 }
+                    }
+                }
+            }
+        }
+        
         // stage ('Trigger SG') {
         //     when {
         //         expression { params.ACTION == 'apply' }
@@ -50,14 +79,14 @@ pipeline{
         //         build job: '10-sg', parameters: [string(name: 'ACTION', value: "apply")], wait: false
         //     }
         // }
-        stage ('Trigger VPC'){
-            when {
-                expression { params.ACTION == 'destroy' }
-             }
-             steps{
-                 build job: '00-vpc', parameters: [string(name: 'ACTION', value: "destroy")], wait: false
-             }
-        }
+        // stage ('Trigger VPC'){
+        //     when {
+        //         expression { params.ACTION == 'destroy' }
+        //      }
+        //      steps{
+        //          build job: '00-vpc', parameters: [string(name: 'ACTION', value: "destroy")], wait: false
+        //      }
+        // }
     }
 
     post {

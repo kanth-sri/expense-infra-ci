@@ -1,36 +1,41 @@
-pipeline{
+pipeline {
     agent {
         label 'AGENT-1'
     }
-     options{
+    options{
         timeout(time: 30, unit: 'MINUTES')
         disableConcurrentBuilds()
         ansiColor('xterm')
     }
-    parameters{
-        choice(name: 'ACTION', choices: ['apply','destroy'], description: 'select ACTION')
+    // environment {
+    //     DEBUG = 'true'
+    // }
+
+    parameters {
+        choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Select Action')
     }
-    stages{
+    stages {
         stage('Init and Plan') {
             steps {
                 withAWS(region: 'us-east-1', credentials: 'aws-creds') {
                     sh """
-                        cd 00-vpc
+                        cd 50-acm
                         terraform init -reconfigure
                         terraform plan -out=tfplan
                     """
                 }
             }
         }
+
         stage('Apply or Destroy') {
-            // input {
-            //     message "Should we continue to ${params.ACTION}"
-            //     ok "Yes, we should."
-            // }
+            /* input {
+                message "Should we continue to ${params.ACTION}"
+                ok "Yes, we should."
+            } */
             steps {
                 withAWS(region: 'us-east-1', credentials: 'aws-creds') {
                     sh """
-                        cd 00-vpc
+                        cd 50-acm
                         if [ ${params.ACTION} == 'apply' ]
                         then
                             terraform apply -auto-approve tfplan
@@ -42,14 +47,29 @@ pipeline{
                 }
             }
         }
-        stage ('Trigger SG') {
-            when {
-                expression { params.ACTION == 'apply' }
+        stage ('Trigger multi') {
+             when {
+                 expression { params.ACTION == 'apply' }
+                  }
+                parallel{
+                    stage('alb'){
+                    steps{
+                 build job: '60-alb', parameters: [string(name: 'ACTION', value: "apply")], wait: false
+                 }
+                    }
+                    stage('ecr'){
+                    steps{
+                 build job: '70-ecr', parameters: [string(name: 'ACTION', value: "apply")], wait: false
+                 }
+                    }
+                    stage('cdn'){
+                    steps{
+                 build job: '80-cdn', parameters: [string(name: 'ACTION', value: "apply")], wait: false
+                 }
+                    }
+                 
             }
-            steps{
-                build job: '10-sg', parameters: [string(name: 'ACTION', value: "apply")], wait: false
-            }
-        }
+
     }
 
     post {
@@ -64,5 +84,4 @@ pipeline{
             echo "This section run when pipeline failure"
         }
     }
-    
 }

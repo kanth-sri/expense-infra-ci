@@ -8,7 +8,7 @@ terraform {
   
   backend "s3" {
     bucket = "srikanth-tf-expense-dev"
-    key    = "expense-sg-ci"
+    key    = "expense-bastion-ci"
     region = "us-east-1"
     dynamodb_table = "srikanth-tf-expense-dev-lock"
   }

@@ -1,104 +1,77 @@
-pipeline{
-    agent {
-        label 'AGENT-1'
-    }
-     options{
+pipeline {
+    agent { label 'AGENT-1' }
+    options {
         timeout(time: 30, unit: 'MINUTES')
         disableConcurrentBuilds()
         ansiColor('xterm')
     }
-    parameters{
-        choice(name: 'ACTION', choices: ['apply','destroy'], description: 'select ACTION')
+    parameters {
+        choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Select ACTION')
     }
-    stages{
-        stage('Init and Plan'){
-            steps{
+    stages {
+        stage('Init and Plan') {
+            steps {
                 withAWS(region: 'us-east-1', credentials: 'aws-creds') {
                     sh """
-                    cd 10-sg
-                    terraform init -reconfigure
-                    terraform plan -out=tfplan
+                        cd 10-sg
+                        terraform init -reconfigure
+                        terraform plan -out=tfplan
                     """
                 }
             }
         }
         stage('Apply or Destroy') {
-            // input {
-            //     message "Should we continue to ${params.ACTION}"
-            //     ok "Yes, we should."
-            // }
             steps {
                 withAWS(region: 'us-east-1', credentials: 'aws-creds') {
                     sh """
                         cd 10-sg
-                        if [ ${params.ACTION} == 'apply' ]
-                        then
+                        if [ "${params.ACTION}" == 'apply' ]; then
                             terraform apply -auto-approve tfplan
-                        elif [ ${params.ACTION} == 'destroy' ]
-                        then
+                        elif [ "${params.ACTION}" == 'destroy' ]; then
                             terraform destroy -auto-approve
                         fi
                     """
                 }
             }
         }
-        stage ('Trigger multi') {
-             when {
-                 expression { params.ACTION == 'apply' }
-                  }
-                parallel{
-                    stage('bastion'){
-                    steps{
-                 build job: '20-bastion', parameters: [string(name: 'ACTION', value: "apply")], wait: false
-                 }
+        stage('Trigger Multi') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            parallel {
+                stage('bastion') {
+                    steps {
+                        build job: '20-bastion', parameters: [string(name: 'ACTION', value: "apply")], wait: false
                     }
-                    stage('rds'){
-                    steps{
-                 build job: '30-rds', parameters: [string(name: 'ACTION', value: "apply")], wait: false
-                 }
+                }
+                stage('rds') {
+                    steps {
+                        build job: '30-rds', parameters: [string(name: 'ACTION', value: "apply")], wait: false
                     }
-                    stage('eks'){
-                    steps{
-                 build job: '40-eks', parameters: [string(name: 'ACTION', value: "apply")], wait: false
-                 }
+                }
+                stage('eks') {
+                    steps {
+                        build job: '40-eks', parameters: [string(name: 'ACTION', value: "apply")], wait: false
                     }
-                    stage('acm'){
-                    steps{
-                 build job: '50-acm', parameters: [string(name: 'ACTION', value: "apply")], wait: false
-                 }
+                }
+                stage('acm') {
+                    steps {
+                        build job: '50-acm', parameters: [string(name: 'ACTION', value: "apply")], wait: false
                     }
                 }
             }
         }
-        
-        // stage ('Trigger SG') {
-        //     when {
-        //         expression { params.ACTION == 'apply' }
-        //     }
-        //     steps{
-        //         build job: '10-sg', parameters: [string(name: 'ACTION', value: "apply")], wait: false
-        //     }
-        // }
-        // stage ('Trigger VPC'){
-        //     when {
-        //         expression { params.ACTION == 'destroy' }
-        //      }
-        //      steps{
-        //          build job: '00-vpc', parameters: [string(name: 'ACTION', value: "destroy")], wait: false
-        //      }
-        // }
     }
-
     post {
-        always{
-            echo "This sections runs always"
+        always {
+            echo "This section runs always"
             deleteDir()
         }
-        success{
-            echo "This section run when pipeline success"
+        success {
+            echo "This section runs when the pipeline succeeds"
         }
-        failure{
-            echo "This section run when pipeline failure"
+        failure {
+            echo "This section runs when the pipeline fails"
         }
     }
-    
+}
